@@ -43,14 +43,16 @@ import java.util.stream.Collectors;
  */
 public class LogisticApp {
     public static void main(String[] args) {
-
+        String filename = "data.csv";
+        ReadFile readFile = new ReadFile();
+        List<Package> packageList =readFile.readFile(filename);
     }
 
     public LocalDate getDeliveryDate(String deliveryDateString) {
         return LocalDate.parse(deliveryDateString, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
     }
 
-    public Map<Long, Map<String, List<Package>>> groupPackagesByTargetLocationAndDeliveryDate(List<Package> packages) {
+    public Map<LocalDate, Map<String, List<Package>>> groupPackagesByTargetLocationAndDeliveryDate(List<Package> packages) {
         return packages.stream()
                 .collect(Collectors.groupingBy(Package::getDeliveryDate,
                         Collectors.groupingBy(Package::getTargetLocation)));
@@ -63,17 +65,19 @@ public class LogisticApp {
     }
 
     private void deliverPackages(List<Package> packages) {
-        Map<Long, Map<String, List<Package>>> packagesByLocationAndDate = groupPackagesByTargetLocationAndDeliveryDate(packages);
+        Map<LocalDate, Map<String, List<Package>>> packagesByLocationAndDate = groupPackagesByTargetLocationAndDeliveryDate(packages);
 
         packagesByLocationAndDate.forEach((location, packagesByDate) -> {
             packagesByDate.forEach((date, packagesForDelivery) -> {
                 double groupValue = calculateThePackageValue(packagesForDelivery);
-                double groupRevenue = calculatePricePerGroup(totalDistance(packagesForDelivery));
+                double groupRevenue = calculatePricePerGroup(packagesForDelivery);
+                if(packagesForDelivery == null){
+                    throw new NullPointerException("No packages were found for delivery.");
+                }
 
-                // Create a new thread to deliver the packages
                 new Thread(() -> {
                     try {
-                        int deliveryTime = calculateTimePerDelivery(totalDistance(packagesForDelivery));
+                        long deliveryTime = (long) calculateTimePerDelivery(packagesForDelivery);
                         System.out.println("[Delivering for <" + location + "> and date <" + date + "> in <" + deliveryTime + "> seconds]");
                         Thread.sleep(deliveryTime * 1000);
                         System.out.println("[Delivery for <" + location + "> and date <" + date + "> completed in <" + deliveryTime + "> seconds]");
@@ -85,8 +89,9 @@ public class LogisticApp {
         });
     }
 
-    private List<Package> totalDistance(List<Package> packagesForDelivery) {
+    private double totalDistance(List<Package> packagesForDelivery) {
         List<Package> result = new ArrayList<>();
+        double helper = 0;
         for (Package p : packagesForDelivery) {
             double distance = p.getTargetDistance();
             double value = p.getPackageValue();
@@ -100,11 +105,16 @@ public class LogisticApp {
             System.out.println("[Delivering for <" + p.getTargetLocation() +
                     "> and date <" + p.getDeliveryDate() + "> in <" + deliveryTime + "> seconds]");
             result.add(p);
+            helper += distance;
         }
-        return result;
+        return helper;
     }
 
-    private int calculateTimePerDelivery(double totalDistance) {
+    private double calculateTimePerDelivery(List<Package> packageList) {
+        double totalDistance = packageList.stream()
+                .mapToDouble(Package::getTargetDistance)
+                .sum();
+        return totalDistance;
     }
 
     public double calculatePricePerGroup(List<Package> group) {
@@ -116,7 +126,5 @@ public class LogisticApp {
     }
 
 
-}
+    }
 
-
-            }
